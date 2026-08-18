@@ -1,0 +1,58 @@
+name: daily-run
+
+on:
+  schedule:
+    - cron: '0 21 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-run
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: 拉取仓库代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 安装依赖
+        run: pip install -r requirements.txt
+
+      - name: 生成评分报告
+        run: python index_score.py
+
+      - name: 发送邮件通知
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USER }}
+          password: ${{ secrets.MAIL_PWD }}
+          subject: 【美股每日评分】纳斯达克100 & 标普500
+          body: 每日美股指数评分报告已生成，详见附件或 GitHub Pages 网页版报告。
+          to: ${{ secrets.MAIL_USER }}
+          from: 美股评分机器人 <${{ secrets.MAIL_USER }}>
+          secure: true
+          attachments: result.html,result.json
+
+      - name: 提交产物到仓库
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add result.html result.json
+          if git diff --cached --quiet; then
+            echo "无变更，跳过提交"
+          else
+            git commit -m "daily update $(date +%F)"
+            git push
+          fi

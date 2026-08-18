@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>美股指数每日评分｜NDX &amp; SPX</title>
+<style>
+  body { font-family: "PingFang SC","Microsoft YaHei",-apple-system,sans-serif; background:#f5f6f8; margin:0; padding:24px; color:#222; }
+  .wrap { max-width: 960px; margin: 0 auto; }
+  h1 { text-align:center; font-size:24px; margin:0 0 6px; }
+  .date { text-align:center; color:#666; margin-bottom:28px; }
+  section { background:#fff; border-radius:10px; box-shadow:0 1px 4px rgba(0,0,0,.08); padding:20px 24px; margin-bottom:24px; }
+  h2 { font-size:18px; margin:0 0 14px; border-left:4px solid #2f6fed; padding-left:10px; }
+  .tables { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  @media (max-width:720px) { .tables { grid-template-columns:1fr; } }
+  table { width:100%; border-collapse:collapse; }
+  caption { font-size:13px; color:#444; font-weight:600; text-align:left; margin-bottom:6px; }
+  th, td { border:1px solid #e3e6ea; padding:8px 10px; font-size:14px; }
+  th { background:#f0f2f5; width:46%; text-align:left; }
+  td { text-align:right; font-variant-numeric:tabular-nums; }
+  .grade { display:inline-block; min-width:28px; text-align:center; font-weight:700; border-radius:4px; padding:2px 8px; }
+  .note { color:#888; font-size:12px; text-align:center; margin-top:20px; line-height:1.8; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>美股指数每日评分｜NDX &amp; SPX</h1>
+  <div class="date">生成日期：2026-08-18</div>
+  <section>
+  <h2>纳斯达克100（NDX）</h2>
+  <div class="tables">
+    <table>
+      <caption>原始输入数据</caption>
+      <tr><th>指数收盘价格</th><td>30,046.14</td></tr>
+      <tr><th>MA200</th><td>26,738.18</td></tr>
+      <tr><th>MA200偏离度(%)</th><td>12.37</td></tr>
+      <tr><th>PE十年百分位</th><td>0.53</td></tr>
+      <tr><th>VIX恐慌指数</th><td>15.90</td></tr>
+    </table>
+    <table>
+      <caption>评分结果</caption>
+      <tr><th>PE得分(满分30)</th><td>14.23</td></tr>
+      <tr><th>MA200得分(满分40)</th><td>0.00</td></tr>
+      <tr><th>VIX得分(满分30)</th><td>1.80</td></tr>
+      <tr><th>综合评分(满分100)</th><td>16.03</td></tr>
+      <tr><th>投资等级</th><td><span class='grade' style='background:#ffb74d;color:#1a1a1a'>D</span></td></tr>
+      <tr><th>投资建议</th><td><span style='text-align:left'>估值偏高，维持小额定投，不重仓</span></td></tr>
+    </table>
+  </div>
+</section>
+  <section>
+  <h2>标普500（SPX）</h2>
+  <div class="tables">
+    <table>
+      <caption>原始输入数据</caption>
+      <tr><th>指数收盘价格</th><td>7,785.76</td></tr>
+      <tr><th>MA200</th><td>7,074.90</td></tr>
+      <tr><th>MA200偏离度(%)</th><td>10.05</td></tr>
+      <tr><th>PE十年百分位</th><td>0.63</td></tr>
+      <tr><th>VIX恐慌指数</th><td>15.90</td></tr>
+    </table>
+    <table>
+      <caption>评分结果</caption>
+      <tr><th>PE得分(满分30)</th><td>11.17</td></tr>
+      <tr><th>MA200得分(满分40)</th><td>0.00</td></tr>
+      <tr><th>VIX得分(满分30)</th><td>1.80</td></tr>
+      <tr><th>综合评分(满分100)</th><td>12.97</td></tr>
+      <tr><th>投资等级</th><td><span class='grade' style='background:#ffb74d;color:#1a1a1a'>D</span></td></tr>
+      <tr><th>投资建议</th><td><span style='text-align:left'>估值偏高，维持小额定投，不重仓</span></td></tr>
+    </table>
+  </div>
+</section>
+  <div class="note">数据来源：Yahoo Finance（行情）、蛋卷基金（PE百分位）、Shiller（标普500辅助对比）。本页面仅供参考，不构成投资建议。</div>
+</div>
+</body>
+</html>

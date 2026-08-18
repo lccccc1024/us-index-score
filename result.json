@@ -1,0 +1,34 @@
+{
+  "date": "2026-08-18",
+  "ndx": {
+    "name": "纳斯达克100（NDX）",
+    "price": 30046.14,
+    "ma200": 26738.18,
+    "dev_pct": 12.37,
+    "pe_percentile": 0.5256,
+    "vix": 15.9,
+    "pe_score": 14.23,
+    "ma_score": 0,
+    "vix_score": 1.8,
+    "total_score": 16.03,
+    "level": "D",
+    "advice": "估值偏高，维持小额定投，不重仓",
+    "pe_percentile_source": "danjuan"
+  },
+  "spx": {
+    "name": "标普500（SPX）",
+    "price": 7785.76,
+    "ma200": 7074.9,
+    "dev_pct": 10.05,
+    "pe_percentile": 0.6276,
+    "vix": 15.9,
+    "pe_score": 11.17,
+    "ma_score": 0,
+    "vix_score": 1.8,
+    "total_score": 12.97,
+    "level": "D",
+    "advice": "估值偏高，维持小额定投，不重仓",
+    "pe_percentile_source": "danjuan",
+    "shiller_pe_percentile": 0.6529
+  }
+}
