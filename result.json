@@ -6,14 +6,15 @@
     "ma200": 26738.18,
     "dev_pct": 12.37,
     "pe_percentile": 0.5256,
-    "vix": 16.07,
+    "vix": 16.0,
     "pe_score": 14.23,
     "ma_score": 0,
-    "vix_score": 2.14,
-    "total_score": 16.37,
+    "vix_score": 2.0,
+    "total_score": 16.23,
     "level": "D",
     "advice": "估值偏高，维持小额定投，不重仓",
-    "pe_percentile_source": "danjuan"
+    "pe_percentile_source": "danjuan",
+    "as_of": "2026-08-14"
   },
   "spx": {
     "name": "标普500（SPX）",
@@ -21,14 +22,15 @@
     "ma200": 7074.9,
     "dev_pct": 10.05,
     "pe_percentile": 0.6276,
-    "vix": 16.07,
+    "vix": 16.0,
     "pe_score": 11.17,
     "ma_score": 0,
-    "vix_score": 2.14,
-    "total_score": 13.31,
+    "vix_score": 2.0,
+    "total_score": 13.17,
     "level": "D",
     "advice": "估值偏高，维持小额定投，不重仓",
     "pe_percentile_source": "danjuan",
+    "as_of": "2026-08-14",
     "shiller_pe_percentile": 0.6529
   }
 }

@@ -15,7 +15,7 @@ import json
 import re
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from io import BytesIO
 
 import requests
@@ -124,7 +124,8 @@ def fetch_market(ticker):
     price = float(close.iloc[-1])
     ma200 = float(close.tail(200).mean())
     dev_pct = (price - ma200) / ma200 * 100
-    return price, ma200, dev_pct
+    as_of = str(close.index[-1].date())
+    return price, ma200, dev_pct, as_of
 
 
 def fetch_vix():
@@ -280,6 +281,7 @@ padding-left:10px;color:#222">{sym['name']}</h2>
         <table width="100%" cellpadding="0" cellspacing="0">
           <tr><td style="font-size:13px;color:#444;font-weight:600;text-align:left;
 padding-bottom:6px">原始输入数据</td></tr>
+          {row("行情日期", sym.get("as_of", "-"))}
           {row("指数收盘价格", f"{sym['price']:,.2f}")}
           {row("MA200", f"{sym['ma200']:,.2f}")}
           {row("MA200偏离度(%)", f"{sym['dev_pct']:.2f}")}
@@ -357,15 +359,17 @@ def selftest():
         assert percentile_of_series(s, 30.0) == 2.0 / 3.0
         assert percentile_of_series(s, 99.0) == 1.0
 
-    rec = build_record("测试指数", 10000.0, 9000.0, 5.0, 0.5, 18.0)
+    rec = build_record("测试指数", 10000.0, 9000.0, 5.0, 0.5, 18.0,
+                       {"as_of": "2026-08-14"})
     assert rec["pe_score"] == 15.0 and rec["ma_score"] == 10.0
     assert rec["vix_score"] == 6.0 and rec["total_score"] == 31.0
-    assert rec["level"] == "D"
+    assert rec["level"] == "D" and rec["as_of"] == "2026-08-14"
     html = render_html("2026-01-01", rec, rec)
     assert "美股指数每日评分" in html
     assert "生成日期：2026-01-01" in html
     assert "10,000.00" in html
     assert "#ffb74d" in html
+    assert "2026-08-14" in html
 
     print("selftest PASS: 公式、clamp、等级边界、百分位、HTML渲染均与文档一致")
     return 0
@@ -381,10 +385,10 @@ def main():
     date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     log(f"开始生成 {date_str} 评分报告")
 
-    ndx_price, ndx_ma200, ndx_dev = with_retry(fetch_market, "^NDX")
-    log(f"NDX 价格={ndx_price:.2f} MA200={ndx_ma200:.2f} 偏离度={ndx_dev:.2f}%")
-    spx_price, spx_ma200, spx_dev = with_retry(fetch_market, "^GSPC")
-    log(f"SPX 价格={spx_price:.2f} MA200={spx_ma200:.2f} 偏离度={spx_dev:.2f}%")
+    ndx_price, ndx_ma200, ndx_dev, ndx_asof = with_retry(fetch_market, "^NDX")
+    log(f"NDX 价格={ndx_price:.2f} MA200={ndx_ma200:.2f} 偏离度={ndx_dev:.2f}% 行情日期={ndx_asof}")
+    spx_price, spx_ma200, spx_dev, spx_asof = with_retry(fetch_market, "^GSPC")
+    log(f"SPX 价格={spx_price:.2f} MA200={spx_ma200:.2f} 偏离度={spx_dev:.2f}% 行情日期={spx_asof}")
     vix = with_retry(fetch_vix)
     log(f"VIX={vix:.2f}")
 
@@ -405,10 +409,15 @@ def main():
         note_lines.append("Shiller 辅助数据本次获取失败，已跳过。")
 
     ndx = build_record("纳斯达克100（NDX）", ndx_price, ndx_ma200, ndx_dev, ndx_pct, vix,
-                       {"pe_percentile_source": "danjuan"})
+                       {"pe_percentile_source": "danjuan", "as_of": ndx_asof})
     spx = build_record("标普500（SPX）", spx_price, spx_ma200, spx_dev, spx_pct, vix,
-                       {"pe_percentile_source": "danjuan",
+                       {"pe_percentile_source": "danjuan", "as_of": spx_asof,
                         "shiller_pe_percentile": round(spx_shiller_pct, 4) if spx_shiller_pct is not None else None})
+
+    as_of_date = date.fromisoformat(min(ndx_asof, spx_asof))
+    if (date.today() - as_of_date).days > 4:
+        log(f"警告: 行情数据日期 {as_of_date} 距今超过4天，可能数据源滞后")
+        note_lines.append(f"行情日期 {as_of_date} 距今超过4天，数据源可能滞后。")
 
     payload = {"date": date_str, "ndx": ndx, "spx": spx}
     with open("result.json", "w", encoding="utf-8") as f:
