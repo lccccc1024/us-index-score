@@ -39,7 +39,8 @@ jobs:
           username: ${{ secrets.MAIL_USER }}
           password: ${{ secrets.MAIL_PWD }}
           subject: 【美股每日评分】纳斯达克100 & 标普500
-          body: 每日美股指数评分报告已生成，详见附件或 GitHub Pages 网页版报告。
+          body: 每日美股指数评分报告已生成，邮件内嵌展示，附件含 result.html / result.json，网页版：https://blog.950922.xyz/us-index-score/result.html
+          html_body: file://result.html
           to: ${{ secrets.MAIL_USER }}
           from: 美股评分机器人 <${{ secrets.MAIL_USER }}>
           secure: true

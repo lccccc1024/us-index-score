@@ -257,32 +257,51 @@ def build_record(name, price, ma200, dev_pct, pe_percentile, vix, extra=None):
 
 def render_html(date_str, ndx, spx, note_lines=None):
     def row(label, value):
-        return f"<tr><th>{label}</th><td>{value}</td></tr>"
+        return ("<tr>"
+                f"<th style='border:1px solid #e3e6ea;padding:8px 10px;font-size:14px;"
+                f"background:#f0f2f5;text-align:left;width:46%'>{label}</th>"
+                f"<td style='border:1px solid #e3e6ea;padding:8px 10px;font-size:14px;"
+                f"text-align:right;font-variant-numeric:tabular-nums'>{value}</td>"
+                "</tr>")
 
     def block(sym):
         grade_bg, grade_fg = GRADE_STYLE[sym["level"]]
-        return f"""<section>
-  <h2>{sym['name']}</h2>
-  <div class="tables">
-    <table>
-      <caption>原始输入数据</caption>
-      {row("指数收盘价格", f"{sym['price']:,.2f}")}
-      {row("MA200", f"{sym['ma200']:,.2f}")}
-      {row("MA200偏离度(%)", f"{sym['dev_pct']:.2f}")}
-      {row("PE十年百分位", f"{sym['pe_percentile']:.2f}")}
-      {row("VIX恐慌指数", f"{sym['vix']:.2f}")}
-    </table>
-    <table>
-      <caption>评分结果</caption>
-      {row("PE得分(满分30)", f"{sym['pe_score']:.2f}")}
-      {row("MA200得分(满分40)", f"{sym['ma_score']:.2f}")}
-      {row("VIX得分(满分30)", f"{sym['vix_score']:.2f}")}
-      {row("综合评分(满分100)", f"{sym['total_score']:.2f}")}
-      {row("投资等级", f"<span class='grade' style='background:{grade_bg};color:{grade_fg}'>{sym['level']}</span>")}
-      {row("投资建议", f"<span style='text-align:left'>{sym['advice']}</span>")}
-    </table>
-  </div>
-</section>"""
+        badge = (f"<span style='display:inline-block;min-width:28px;text-align:center;"
+                 f"font-weight:700;border-radius:4px;padding:2px 8px;"
+                 f"background:{grade_bg};color:{grade_fg}'>{sym['level']}</span>")
+        return f"""<table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+style="width:100%;max-width:960px;background:#ffffff;border:1px solid #e3e6ea;
+border-radius:10px;margin:0 auto 24px"><tr><td style="padding:20px 24px">
+  <h2 style="font-size:18px;margin:0 0 14px;border-left:4px solid #2f6fed;
+padding-left:10px;color:#222">{sym['name']}</h2>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+      <td width="50%" valign="top" style="padding-right:10px">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr><td style="font-size:13px;color:#444;font-weight:600;text-align:left;
+padding-bottom:6px">原始输入数据</td></tr>
+          {row("指数收盘价格", f"{sym['price']:,.2f}")}
+          {row("MA200", f"{sym['ma200']:,.2f}")}
+          {row("MA200偏离度(%)", f"{sym['dev_pct']:.2f}")}
+          {row("PE十年百分位", f"{sym['pe_percentile']:.2f}")}
+          {row("VIX恐慌指数", f"{sym['vix']:.2f}")}
+        </table>
+      </td>
+      <td width="50%" valign="top" style="padding-left:10px">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr><td style="font-size:13px;color:#444;font-weight:600;text-align:left;
+padding-bottom:6px">评分结果</td></tr>
+          {row("PE得分(满分30)", f"{sym['pe_score']:.2f}")}
+          {row("MA200得分(满分40)", f"{sym['ma_score']:.2f}")}
+          {row("VIX得分(满分30)", f"{sym['vix_score']:.2f}")}
+          {row("综合评分(满分100)", f"{sym['total_score']:.2f}")}
+          {row("投资等级", badge)}
+          {row("投资建议", f"<span style='text-align:left'>{sym['advice']}</span>")}
+        </table>
+      </td>
+    </tr>
+  </table>
+</td></tr></table>"""
 
     note = "数据来源：Yahoo Finance（行情）、蛋卷基金（PE百分位）、Shiller（标普500辅助对比）。本页面仅供参考，不构成投资建议。"
     if note_lines:
@@ -293,32 +312,20 @@ def render_html(date_str, ndx, spx, note_lines=None):
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>美股指数每日评分｜NDX &amp; SPX</title>
-<style>
-  body {{ font-family: "PingFang SC","Microsoft YaHei",-apple-system,sans-serif; background:#f5f6f8; margin:0; padding:24px; color:#222; }}
-  .wrap {{ max-width: 960px; margin: 0 auto; }}
-  h1 {{ text-align:center; font-size:24px; margin:0 0 6px; }}
-  .date {{ text-align:center; color:#666; margin-bottom:28px; }}
-  section {{ background:#fff; border-radius:10px; box-shadow:0 1px 4px rgba(0,0,0,.08); padding:20px 24px; margin-bottom:24px; }}
-  h2 {{ font-size:18px; margin:0 0 14px; border-left:4px solid #2f6fed; padding-left:10px; }}
-  .tables {{ display:grid; grid-template-columns:1fr 1fr; gap:20px; }}
-  @media (max-width:720px) {{ .tables {{ grid-template-columns:1fr; }} }}
-  table {{ width:100%; border-collapse:collapse; }}
-  caption {{ font-size:13px; color:#444; font-weight:600; text-align:left; margin-bottom:6px; }}
-  th, td {{ border:1px solid #e3e6ea; padding:8px 10px; font-size:14px; }}
-  th {{ background:#f0f2f5; width:46%; text-align:left; }}
-  td {{ text-align:right; font-variant-numeric:tabular-nums; }}
-  .grade {{ display:inline-block; min-width:28px; text-align:center; font-weight:700; border-radius:4px; padding:2px 8px; }}
-  .note {{ color:#888; font-size:12px; text-align:center; margin-top:20px; line-height:1.8; }}
-</style>
 </head>
-<body>
-<div class="wrap">
-  <h1>美股指数每日评分｜NDX &amp; SPX</h1>
-  <div class="date">生成日期：{date_str}</div>
+<body style="margin:0;padding:0;background:#f5f6f8">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#f5f6f8">
+<tr><td align="center" style="padding:24px 8px">
+  <h1 style="text-align:center;font-size:24px;margin:0 0 6px;color:#222;
+font-family:'PingFang SC','Microsoft YaHei',-apple-system,sans-serif">
+美股指数每日评分｜NDX &amp; SPX</h1>
+  <div style="text-align:center;color:#666;margin:0 0 24px;font-size:14px">生成日期：{date_str}</div>
   {block(ndx)}
   {block(spx)}
-  <div class="note">{note}</div>
-</div>
+  <div style="color:#888;font-size:12px;text-align:center;margin-top:20px;line-height:1.8;
+font-family:'PingFang SC','Microsoft YaHei',-apple-system,sans-serif">{note}</div>
+</td></tr>
+</table>
 </body>
 </html>"""
 
@@ -358,7 +365,7 @@ def selftest():
     assert "美股指数每日评分" in html
     assert "生成日期：2026-01-01" in html
     assert "10,000.00" in html
-    assert "class='grade'" in html
+    assert "#ffb74d" in html
 
     print("selftest PASS: 公式、clamp、等级边界、百分位、HTML渲染均与文档一致")
     return 0
