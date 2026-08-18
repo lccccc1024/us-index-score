@@ -119,20 +119,22 @@ def level_and_advice(total):
     return "E", "极度高估，谨慎，减少加仓"
 
 
-def quote_session_date(ticker):
-    """从雅虎 chart meta 取最近一个常规会话的时间戳日期。
+def quote_session_meta(ticker):
+    """雅虎 chart meta: 最近完成会话的收盘价与时间戳。
 
-    雅虎日线K线的日期标签可能滞后（最新未入账K线被跳过），
-    但 meta 的 regularMarketTime 总是最近完成会话的时间，据此得到正确 as_of。
+    K线末根可能滞后（最新交易日K线未入库），而 meta.regularMarketPrice
+    始终是最近一个完成会话的收盘价，带正确时间戳。
     """
     url = ("https://query1.finance.yahoo.com/v8/finance/chart/"
            f"{urllib.parse.quote(ticker)}?range=1mo&interval=1d")
     d = http_get_json(url)
     meta = d["chart"]["result"][0]["meta"]
+    price = meta.get("regularMarketPrice")
     ts = meta.get("regularMarketTime")
-    if ts:
-        return str(datetime.fromtimestamp(ts, timezone.utc).date())
-    return None
+    if price is None or ts is None:
+        return None, None
+    as_of = str(datetime.fromtimestamp(ts, timezone.utc).date())
+    return float(price), as_of
 
 
 def fetch_market(ticker):
@@ -142,10 +144,17 @@ def fetch_market(ticker):
     if df is None or len(df) < 200:
         raise RuntimeError(f"{ticker} 历史数据不足: {0 if df is None else len(df)} 条")
     close = df["Close"].dropna()
-    price = float(close.iloc[-1])
+    price, as_of = quote_session_meta(ticker)
+    if price is None:
+        price = float(close.iloc[-1])
+        as_of = str(close.index[-1].date())
+        log(f"{ticker} 使用K线末根作为收盘价: {price:.2f} ({as_of})")
+    else:
+        bar_price = float(close.iloc[-1])
+        if abs(bar_price - price) / price > 0.001:
+            log(f"{ticker} K线末根({bar_price:.2f})与meta收盘({price:.2f})不一致，采用meta")
     ma200 = float(close.tail(200).mean())
     dev_pct = (price - ma200) / ma200 * 100
-    as_of = quote_session_date(ticker) or str(close.index[-1].date())
     return price, ma200, dev_pct, as_of
 
 
