@@ -15,6 +15,7 @@ import json
 import re
 import sys
 import time
+import urllib.parse
 from datetime import date, datetime, timezone
 from io import BytesIO
 
@@ -76,6 +77,10 @@ def http_get(url, headers=None, timeout=HTTP_TIMEOUT, retries=RETRIES):
     raise RuntimeError(f"请求最终失败: {url} -> {last}")
 
 
+def http_get_json(url):
+    return http_get(url).json()
+
+
 def with_retry(fn, *args, retries=RETRIES, **kwargs):
     last = None
     for i in range(retries):
@@ -114,6 +119,22 @@ def level_and_advice(total):
     return "E", "极度高估，谨慎，减少加仓"
 
 
+def quote_session_date(ticker):
+    """从雅虎 chart meta 取最近一个常规会话的时间戳日期。
+
+    雅虎日线K线的日期标签可能滞后（最新未入账K线被跳过），
+    但 meta 的 regularMarketTime 总是最近完成会话的时间，据此得到正确 as_of。
+    """
+    url = ("https://query1.finance.yahoo.com/v8/finance/chart/"
+           f"{urllib.parse.quote(ticker)}?range=1mo&interval=1d")
+    d = http_get_json(url)
+    meta = d["chart"]["result"][0]["meta"]
+    ts = meta.get("regularMarketTime")
+    if ts:
+        return str(datetime.fromtimestamp(ts, timezone.utc).date())
+    return None
+
+
 def fetch_market(ticker):
     if yf is None:
         raise RuntimeError("缺少 yfinance 依赖")
@@ -124,7 +145,7 @@ def fetch_market(ticker):
     price = float(close.iloc[-1])
     ma200 = float(close.tail(200).mean())
     dev_pct = (price - ma200) / ma200 * 100
-    as_of = str(close.index[-1].date())
+    as_of = quote_session_date(ticker) or str(close.index[-1].date())
     return price, ma200, dev_pct, as_of
 
 
