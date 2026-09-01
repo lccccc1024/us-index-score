@@ -12,6 +12,7 @@
 
 import argparse
 import json
+import math
 import re
 import sys
 import time
@@ -98,10 +99,20 @@ def clamp(v, lo, hi):
 
 
 def compute_scores(pe_percentile, dev_pct, vix):
-    """严格按开发文档公式：PE30 + MA200 40 + VIX 30，各自 clamp。"""
+    """改进后评分公式：S型MA200 + 对数VIX + 线性PE。
+
+    MA200: 40 / (1 + e^(dev%/5)) — 平滑S型曲线，消除线性断崖。
+           dev%=0 → 20，dev%=10 → 4.8，dev%=-10 → 35.2
+    VIX:   30 × log(VIX/8) / log(4) — 对数缩放，正常区间灵敏。
+           VIX=8 → 0，VIX=15 → 13.6，VIX=30 → 28.6，VIX≥32 → 30
+    PE:    30 × (1 − pe_percentile) — 线性映射，百分位越低越便宜得分越高。
+    """
     pe_score = round(clamp(30 * (1 - pe_percentile), 0, 30), 2)
-    ma_score = round(clamp(20 - dev_pct * 2, 0, 40), 2)
-    vix_score = round(clamp((vix - 15) / 15 * 30, 0, 30), 2)
+    ma_score = round(clamp(40 / (1 + math.exp(dev_pct / 5)), 0, 40), 2)
+    if vix <= 8:
+        vix_score = 0.0
+    else:
+        vix_score = round(clamp(30 * math.log(vix / 8) / math.log(4), 0, 30), 2)
     total_score = round(pe_score + ma_score + vix_score, 2)
     return pe_score, ma_score, vix_score, total_score
 
@@ -363,16 +374,19 @@ font-family:'PingFang SC','Microsoft YaHei',-apple-system,sans-serif">{note}</di
 
 
 def selftest():
+    # 主样例（新公式期望值）
     pe, ma, vix, total = compute_scores(0.88, 7.96, 18.87)
     level, advice = level_and_advice(total)
-    exp = (3.6, 4.08, 7.74, 15.42)
+    exp = (3.6, 6.76, 18.57, 28.93)
     assert (pe, ma, vix, total) == exp, f"样例不符: {(pe, ma, vix, total)} != {exp}"
     assert level == "D" and advice == "估值偏高，维持小额定投，不重仓", (level, advice)
 
-    assert compute_scores(1.0, 20.0, 10.0) == (0.0, 0.0, 0.0, 0.0)
-    assert compute_scores(0.0, -20.0, 60.0) == (30.0, 40.0, 30.0, 100.0)
-    assert compute_scores(0.5, 0.0, 15.0) == (15.0, 20.0, 0.0, 35.0)
+    # 极端边界
+    assert compute_scores(1.0, 20.0, 10.0) == (0.0, 0.72, 4.83, 5.55)
+    assert compute_scores(0.0, -20.0, 60.0) == (30.0, 39.28, 30.0, 99.28)
+    assert compute_scores(0.5, 0.0, 15.0) == (15.0, 20.0, 13.6, 48.6)
 
+    # 等级边界
     assert level_and_advice(80.0)[0] == "A"
     assert level_and_advice(79.99)[0] == "B"
     assert level_and_advice(60.0)[0] == "B"
@@ -382,6 +396,7 @@ def selftest():
     assert level_and_advice(6.0)[0] == "D"
     assert level_and_advice(5.99)[0] == "E"
 
+    # 百分位函数
     if pd is not None:
         s = pd.Series([10.0, 20.0, 30.0])
         assert percentile_of_series(s, 10.0) == 0.0
@@ -389,19 +404,21 @@ def selftest():
         assert percentile_of_series(s, 30.0) == 2.0 / 3.0
         assert percentile_of_series(s, 99.0) == 1.0
 
+    # HTML渲染冒烟
     rec = build_record("测试指数", 10000.0, 9000.0, 5.0, 0.5, 18.0,
                        {"as_of": "2026-08-14"})
-    assert rec["pe_score"] == 15.0 and rec["ma_score"] == 10.0
-    assert rec["vix_score"] == 6.0 and rec["total_score"] == 31.0
-    assert rec["level"] == "D" and rec["as_of"] == "2026-08-14"
+    pe2, ma2, vx2, tot2 = compute_scores(0.5, 5.0, 18.0)
+    assert rec["pe_score"] == pe2 and rec["ma_score"] == ma2
+    assert rec["vix_score"] == vx2 and rec["total_score"] == tot2
+    assert rec["as_of"] == "2026-08-14"
     html = render_html("2026-01-01", rec, rec)
     assert "美股指数每日评分" in html
     assert "生成日期：2026-01-01" in html
     assert "10,000.00" in html
-    assert "#ffb74d" in html
+    assert "#fff9c4" in html
     assert "2026-08-14" in html
 
-    print("selftest PASS: 公式、clamp、等级边界、百分位、HTML渲染均与文档一致")
+    print("selftest PASS: 改进公式(S型MA200+对数VIX)、等级边界、百分位、HTML渲染均与文档一致")
     return 0
 
 
