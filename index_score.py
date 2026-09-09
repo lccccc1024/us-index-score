@@ -19,6 +19,7 @@ import time
 import urllib.parse
 from datetime import date, datetime, timezone
 from io import BytesIO
+from zoneinfo import ZoneInfo
 
 import requests
 
@@ -98,6 +99,71 @@ def clamp(v, lo, hi):
     return max(lo, min(hi, v))
 
 
+def finite_number(value, name, positive=False, percentile=False):
+    if isinstance(value, bool):
+        raise ValueError(f"{name}: boolean is not a number")
+    value = float(value)
+    if not math.isfinite(value):
+        raise ValueError(f"{name}: must be finite")
+    if positive and value <= 0:
+        raise ValueError(f"{name}: must be positive")
+    if percentile and not 0 <= value <= 1:
+        raise ValueError(f"{name}: must be between 0 and 1")
+    return value
+
+
+def source_date(value):
+    return date.fromisoformat(str(value)).isoformat()
+
+
+def danjuan_date(value, today=None):
+    today = today or datetime.now(timezone.utc).date()
+    if isinstance(value, str) and re.fullmatch(r"\d{2}-\d{2}", value):
+        # 蛋卷只提供月日：采用最近一次该日期，跨年时回溯上一年。
+        for year in range(today.year, today.year - 5, -1):
+            try:
+                candidate = date.fromisoformat(f"{year}-{value}")
+            except ValueError:
+                continue
+            if candidate <= today:
+                return candidate.isoformat()
+        raise ValueError(f"Invalid Danjuan date: {value}")
+    return source_date(value)
+
+
+def date_warnings(dates, today=None):
+    today = today or datetime.now(timezone.utc).date()
+    notes = []
+    for label, value in dates.items():
+        day = date.fromisoformat(source_date(value))
+        if day > today:
+            raise ValueError(f"{label} 日期 {day} 在未来")
+        if (today - day).days > 4:
+            notes.append(f"{label}日期 {day} 距今超过4天，数据源可能滞后。")
+    if len(set(dates.values())) > 1:
+        notes.append("数据来源日期不一致：" + "；".join(f"{k}={v}" for k, v in dates.items()))
+    return notes
+
+
+def completed_closes(df):
+    if df is None or df.empty:
+        raise RuntimeError("历史数据为空")
+    close = df["Close"].dropna().copy()
+    close.index = [x.date().isoformat() for x in close.index]
+    if close.index.has_duplicates:
+        raise ValueError("历史数据包含重复交易日")
+    now = datetime.now(ZoneInfo("America/New_York"))
+    today = now.date().isoformat()
+    # 手动运行不采用盘中日线；提前收市日保守地等到16点。
+    close = close[(close.index < today) | ((close.index == today) & (now.hour >= 16))]
+    close = close.sort_index()
+    for value in close:
+        finite_number(value, "Close", positive=True)
+    if close.empty:
+        raise RuntimeError("没有已完成交易日的有效收盘价")
+    return close
+
+
 def compute_scores(pe_percentile, dev_pct, vix):
     """改进后评分公式：S型MA200 + 对数VIX + 线性PE。
 
@@ -107,8 +173,12 @@ def compute_scores(pe_percentile, dev_pct, vix):
            VIX=8 → 0，VIX=15 → 13.6，VIX=30 → 28.6，VIX≥32 → 30
     PE:    30 × (1 − pe_percentile) — 线性映射，百分位越低越便宜得分越高。
     """
+    pe_percentile = finite_number(pe_percentile, "PE percentile", percentile=True)
+    dev_pct = finite_number(dev_pct, "MA deviation")
+    vix = finite_number(vix, "VIX", positive=True)
     pe_score = round(clamp(30 * (1 - pe_percentile), 0, 30), 2)
-    ma_score = round(clamp(40 / (1 + math.exp(dev_pct / 5)), 0, 40), 2)
+    exp_neg = math.exp(-abs(dev_pct / 5))
+    ma_score = round(40 * (exp_neg if dev_pct >= 0 else 1) / (1 + exp_neg), 2)
     if vix <= 8:
         vix_score = 0.0
     else:
@@ -131,11 +201,7 @@ def level_and_advice(total):
 
 
 def quote_session_meta(ticker):
-    """雅虎 chart meta: 最近完成会话的收盘价与时间戳。
-
-    K线末根可能滞后（最新交易日K线未入库），而 meta.regularMarketPrice
-    始终是最近一个完成会话的收盘价，带正确时间戳。
-    """
+    """返回已完成交易日的meta价格；盘中报价不作为收盘价。"""
     url = ("https://query1.finance.yahoo.com/v8/finance/chart/"
            f"{urllib.parse.quote(ticker)}?range=1mo&interval=1d")
     d = http_get_json(url)
@@ -144,27 +210,29 @@ def quote_session_meta(ticker):
     ts = meta.get("regularMarketTime")
     if price is None or ts is None:
         return None, None
-    as_of = str(datetime.fromtimestamp(ts, timezone.utc).date())
-    return float(price), as_of
+    market_time = datetime.fromtimestamp(ts, ZoneInfo("America/New_York"))
+    now = datetime.now(ZoneInfo("America/New_York"))
+    if market_time > now or (market_time.date() == now.date() and now.hour < 16):
+        return None, None
+    return finite_number(price, "meta price", positive=True), market_time.date().isoformat()
 
 
 def fetch_market(ticker):
     if yf is None:
         raise RuntimeError("缺少 yfinance 依赖")
     df = yf.Ticker(ticker).history(period="1y", interval="1d", auto_adjust=False)
-    if df is None or len(df) < 200:
-        raise RuntimeError(f"{ticker} 历史数据不足: {0 if df is None else len(df)} 条")
-    close = df["Close"].dropna()
+    close = completed_closes(df)
     price, as_of = quote_session_meta(ticker)
-    if price is None:
-        price = float(close.iloc[-1])
-        as_of = str(close.index[-1].date())
-        log(f"{ticker} 使用K线末根作为收盘价: {price:.2f} ({as_of})")
-    else:
-        bar_price = float(close.iloc[-1])
-        if abs(bar_price - price) / price > 0.001:
-            log(f"{ticker} K线末根({bar_price:.2f})与meta收盘({price:.2f})不一致，采用meta")
-    ma200 = float(close.tail(200).mean())
+    if price is not None:
+        price = finite_number(price, "meta price", positive=True)
+        as_of = source_date(as_of)
+        if as_of >= close.index[-1]:
+            close.loc[as_of] = price
+    if len(close) < 200:
+        raise RuntimeError(f"{ticker} 有效收盘数据不足200条: {len(close)} 条")
+    price = float(close.iloc[-1])
+    as_of = close.index[-1]
+    ma200 = finite_number(close.tail(200).mean(), "MA200", positive=True)
     dev_pct = (price - ma200) / ma200 * 100
     return price, ma200, dev_pct, as_of
 
@@ -175,7 +243,8 @@ def fetch_vix():
     df = yf.Ticker("^VIX").history(period="5d", interval="1d", auto_adjust=False)
     if df is None or df.empty:
         raise RuntimeError("VIX 数据获取失败")
-    return float(df["Close"].dropna().iloc[-1])
+    close = completed_closes(df)
+    return float(close.iloc[-1]), close.index[-1]
 
 
 def fetch_danjuan_percentiles():
@@ -198,8 +267,9 @@ def fetch_danjuan_percentiles():
                 raise RuntimeError(f"蛋卷接口 {code} 缺少 pe_percentile")
             out[code] = {
                 "pe": it.get("pe"),
-                "pe_percentile": float(pct),
-                "date": it.get("date"),
+                "pe_percentile": finite_number(pct, f"{code} PE percentile", percentile=True),
+                "date": danjuan_date(it.get("date")),
+                "date_year_inferred": bool(re.fullmatch(r"\d{2}-\d{2}", str(it.get("date")))),
             }
     if "NDX" not in out or "SP500" not in out:
         raise RuntimeError("蛋卷接口缺失 NDX/SP500 数据")
@@ -272,10 +342,17 @@ def fetch_shiller_pe_series():
 
 def percentile_of_series(series, current):
     """按文档定义：历史10年PE序列中，小于 current 的数量 / 总样本数量。"""
+    current = finite_number(current, "current PE", positive=True)
+    if len(series) == 0:
+        raise ValueError("PE series is empty")
+    for value in series:
+        finite_number(value, "historical PE", positive=True)
     return float((series < current).mean())
 
 
 def build_record(name, price, ma200, dev_pct, pe_percentile, vix, extra=None):
+    price = finite_number(price, "price", positive=True)
+    ma200 = finite_number(ma200, "MA200", positive=True)
     pe_score, ma_score, vix_score, total_score = compute_scores(pe_percentile, dev_pct, vix)
     level, advice = level_and_advice(total_score)
     rec = {
@@ -327,7 +404,9 @@ padding-bottom:6px">原始输入数据</td></tr>
           {row("MA200", f"{sym['ma200']:,.2f}")}
           {row("MA200偏离度(%)", f"{sym['dev_pct']:.2f}")}
           {row("PE十年百分位", f"{sym['pe_percentile']:.2f}")}
+          {row("PE数据日期", sym.get("pe_as_of", "-"))}
           {row("VIX恐慌指数", f"{sym['vix']:.2f}")}
+          {row("VIX数据日期", sym.get("vix_as_of", "-"))}
         </table>
       </td>
       <td width="50%" valign="top" style="padding-left:10px">
@@ -436,7 +515,7 @@ def main():
     log(f"NDX 价格={ndx_price:.2f} MA200={ndx_ma200:.2f} 偏离度={ndx_dev:.2f}% 行情日期={ndx_asof}")
     spx_price, spx_ma200, spx_dev, spx_asof = with_retry(fetch_market, "^GSPC")
     log(f"SPX 价格={spx_price:.2f} MA200={spx_ma200:.2f} 偏离度={spx_dev:.2f}% 行情日期={spx_asof}")
-    vix = with_retry(fetch_vix)
+    vix, vix_asof = with_retry(fetch_vix)
     log(f"VIX={vix:.2f}")
 
     danjuan = fetch_danjuan_percentiles()
@@ -445,7 +524,14 @@ def main():
     log(f"蛋卷百分位 NDX={ndx_pct:.4f} SP500={spx_pct:.4f}")
 
     spx_shiller_pct = None
-    note_lines = []
+    note_lines = date_warnings({
+        "NDX行情": ndx_asof, "SPX行情": spx_asof, "VIX": vix_asof,
+        "NDX PE": danjuan["NDX"]["date"], "SPX PE": danjuan["SP500"]["date"],
+    })
+    if any(item.get("date_year_inferred") for item in danjuan.values()):
+        note_lines.append("蛋卷PE日期仅提供月日，年份按最近一次该日期推定。")
+    for note in note_lines:
+        log(f"警告: {note}")
     try:
         shiller = fetch_shiller_pe_series()
         current_pe = float(shiller["pe"].iloc[-1])
@@ -456,25 +542,24 @@ def main():
         note_lines.append("Shiller 辅助数据本次获取失败，已跳过。")
 
     ndx = build_record("纳斯达克100（NDX）", ndx_price, ndx_ma200, ndx_dev, ndx_pct, vix,
-                       {"pe_percentile_source": "danjuan", "as_of": ndx_asof})
+                       {"pe_percentile_source": "danjuan", "as_of": ndx_asof,
+                        "pe_as_of": danjuan["NDX"]["date"], "vix_as_of": vix_asof})
     spx = build_record("标普500（SPX）", spx_price, spx_ma200, spx_dev, spx_pct, vix,
                        {"pe_percentile_source": "danjuan", "as_of": spx_asof,
+                        "pe_as_of": danjuan["SP500"]["date"], "vix_as_of": vix_asof,
                         "shiller_pe_percentile": round(spx_shiller_pct, 4) if spx_shiller_pct is not None else None})
 
-    as_of_date = date.fromisoformat(min(ndx_asof, spx_asof))
-    if (date.today() - as_of_date).days > 4:
-        log(f"警告: 行情数据日期 {as_of_date} 距今超过4天，可能数据源滞后")
-        note_lines.append(f"行情日期 {as_of_date} 距今超过4天，数据源可能滞后。")
-
-    payload = {"date": date_str, "ndx": ndx, "spx": spx}
-    with open("result.json", "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, indent=2)
-
+    payload = {"date": date_str, "ndx": ndx, "spx": spx, "warnings": note_lines}
+    # 校验和渲染完成后再打开输出文件，避免非法值覆盖旧报告。
+    serialized = json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False)
     html = render_html(date_str, ndx, spx, note_lines)
+    with open("result.json", "w", encoding="utf-8") as f:
+        f.write(serialized)
+
     with open("result.html", "w", encoding="utf-8") as f:
         f.write(html)
 
-    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    print(serialized)
     log("完成: result.json / result.html 已生成")
     return 0
 

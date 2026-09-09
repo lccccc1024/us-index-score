@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: daily-run
@@ -14,6 +14,8 @@ concurrency:
 
 jobs:
   run:
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -28,8 +30,66 @@ jobs:
       - name: 安装依赖
         run: pip install -r requirements.txt
 
+      - name: Run offline tests
+        run: |
+          python index_score.py --selftest
+          python -m unittest discover -s tests -v
+
       - name: 生成评分报告
         run: python index_score.py
+
+      - name: Stage report
+        run: |
+          mkdir -p _site
+          cp index.html result.html result.json _site/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: report
+          path: _site/
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site/
+
+      - name: 提交产物到仓库
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add result.html result.json
+          if git diff --cached --quiet; then
+            echo "无变更，跳过提交"
+          else
+            git commit -m "daily update $(date +%F)"
+            git push
+          fi
+  deploy:
+    needs: run
+    if: ${{ !cancelled() && needs.run.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - uses: actions/deploy-pages@v4
+        id: deployment
+
+  notify:
+    needs: run
+    if: ${{ !cancelled() && needs.run.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: report
+          path: .
 
       - name: 发送邮件通知
         uses: dawidd6/action-send-mail@v3
@@ -45,15 +105,3 @@ jobs:
           from: 美股评分机器人 <${{ secrets.MAIL_USER }}>
           secure: true
           attachments: result.html,result.json
-
-      - name: 提交产物到仓库
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add result.html result.json
-          if git diff --cached --quiet; then
-            echo "无变更，跳过提交"
-          else
-            git commit -m "daily update $(date +%F)"
-            git push
-          fi

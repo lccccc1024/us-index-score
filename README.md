@@ -43,7 +43,11 @@ GitHub Actions 定时运行（工作日 21:00 UTC，即北京时间次日 05:00�
 1. 拉取行情、VIX、PE 百分位（含失败重试）
 2. 计算评分并生成 `result.json` / `result.html`
 3. 通过 Gmail SMTP 发送邮件（正文内嵌 HTML 报告，附件含 result.html / result.json）
-4. 提交报告到仓库，GitHub Pages 自动发布
+4. 提交报告到仓库；独立任务显式部署 GitHub Pages，邮件失败不阻断发布
+
+首次使用此工作流，请在仓库 **Settings → Pages → Build and deployment → Source** 选择 **GitHub Actions**，并允许 `github-pages` 环境从运行分支部署。工作流仅发布 `index.html`、`result.html` 和 `result.json`。
+
+输入拒绝 NaN、Infinity、非正价格/VIX 和超出 0–1 的 PE 百分位。MA200 使用合并最新收盘价后的最后 200 个有效交易日；盘中运行不使用当天未收盘日线。报告保留 PE、VIX 日期，并在日期不一致或超过四天时告警；蛋卷仅提供月日时，年份按最近一次该日期推定并注明。
 
 ### 所需 Secrets
 
@@ -58,6 +62,7 @@ GitHub Actions 定时运行（工作日 21:00 UTC，即北京时间次日 05:00�
 pip install -r requirements.txt
 python index_score.py            # 生成当日评分
 python index_score.py --selftest # 公式自检（离线）
+python -m unittest discover -s tests -v # 数据处理回归测试（离线）
 ```
 
 输出：控制台打印 JSON 结果，并写入 `result.json` / `result.html`。

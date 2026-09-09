@@ -57,6 +57,10 @@
 - Shiller辅助数据获取失败：仅打印告警，不阻断评分（SPX主值仍来自蛋卷）。
 - 价格、VIX获取失败：job失败退出。
 - 行情日期（as_of）距今超过4个自然日：仅打印告警并在报告注明，不阻断评分。
+- PE、VIX 日期同样检查四天滞后阈值；各来源日期不一致时，在 HTML 和 JSON `warnings` 中明确提示。
+- 缺失、非法或未来日期报错。蛋卷返回 `MM-DD` 时按最近一次该日期补全年份（含跨年），报告注明年份推定，无法识别整年级别的陈旧数据。
+- 输入拒绝 NaN/Infinity、非正价格/MA200/VIX、越界 PE 百分位。清洗并合并最新收盘后必须有至少200个有效交易日。同日meta替换末根、较新meta追加，较旧meta忽略。
+- 手动运行时，以纽约时间16点作为当日日线可用边界；提前收市日也保守等待16点。
 
 ## 4. 输出规范
 
@@ -77,6 +81,8 @@
 ```json
 {
   "as_of": "YYYY-MM-DD（收盘价对应交易日）",
+  "pe_as_of": "YYYY-MM-DD（PE数据日期，蛋卷月日格式需推定年份）",
+  "vix_as_of": "YYYY-MM-DD（VIX收盘日期）",
   "price": 收盘价格,
   "ma200": MA200价格,
   "dev_pct": MA200偏离度百分比,
@@ -127,8 +133,10 @@
 1. 拉取仓库代码
 2. 安装Python 3.12 + 依赖
 3. 执行 `python index_score.py` → 输出 result.json / result.html
-4. 通过Gmail SMTP发送邮件（正文内嵌HTML报告 + 附件）
-5. 提交产物到仓库（仅在有变更时提交）
+4. 上传报告产物，提交产物到仓库（仅在有变更时提交）
+5. 独立 `deploy` 任务通过 `upload-pages-artifact` / `deploy-pages` 显式发布；独立 `notify` 任务通过 Gmail SMTP 发邮件，互不阻断，失败各自标记
+
+生成前执行公式自检与 `tests/` 离线回归测试。部署前需将仓库 Settings → Pages 的 Source 设为 GitHub Actions，并确保 `github-pages` 环境允许运行分支。发布目录只包含入口页和两份报告，不上传仓库源码。部署任务单独获得 `pages: write` / `id-token: write` 权限。
 
 ### 6.3 所需Secrets
 | Secret | 说明 |
