@@ -1,36 +1,43 @@
 {
-  "date": "2026-09-08",
+  "date": "2026-09-09",
   "ndx": {
     "name": "纳斯达克100（NDX）",
     "price": 29507.7,
     "ma200": 27054.51,
     "dev_pct": 9.07,
-    "pe_percentile": 0.4724,
-    "vix": 15.3,
-    "pe_score": 15.83,
+    "pe_percentile": 0.4704,
+    "vix": 15.72,
+    "pe_score": 15.89,
     "ma_score": 5.61,
-    "vix_score": 14.03,
-    "total_score": 35.47,
+    "vix_score": 14.62,
+    "total_score": 36.12,
     "level": "D",
     "advice": "估值偏高，维持小额定投，不重仓",
     "pe_percentile_source": "danjuan",
-    "as_of": "2026-09-08"
+    "as_of": "2026-09-08",
+    "pe_as_of": "2026-09-08",
+    "vix_as_of": "2026-09-08"
   },
   "spx": {
     "name": "标普500（SPX）",
     "price": 7673.52,
     "ma200": 7147.05,
     "dev_pct": 7.37,
-    "pe_percentile": 0.5856,
-    "vix": 15.3,
-    "pe_score": 12.43,
+    "pe_percentile": 0.574,
+    "vix": 15.72,
+    "pe_score": 12.78,
     "ma_score": 7.46,
-    "vix_score": 14.03,
-    "total_score": 33.92,
+    "vix_score": 14.62,
+    "total_score": 34.86,
     "level": "D",
     "advice": "估值偏高，维持小额定投，不重仓",
     "pe_percentile_source": "danjuan",
     "as_of": "2026-09-08",
+    "pe_as_of": "2026-09-08",
+    "vix_as_of": "2026-09-08",
     "shiller_pe_percentile": 0.6198
-  }
+  },
+  "warnings": [
+    "蛋卷PE日期仅提供月日，年份按最近一次该日期推定。"
+  ]
 }
