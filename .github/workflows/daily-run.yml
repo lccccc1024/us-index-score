@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '0 21 * * 1-5'
   workflow_dispatch:
+    inputs:
+      send_email:
+        description: Send the report by email after a manual run
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -81,7 +86,7 @@ jobs:
 
   notify:
     needs: run
-    if: ${{ !cancelled() && needs.run.result == 'success' }}
+    if: ${{ !cancelled() && needs.run.result == 'success' && (github.event_name == 'schedule' || inputs.send_email) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}
