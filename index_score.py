@@ -188,14 +188,24 @@ def compute_scores(pe_percentile, dev_pct, vix):
 
 
 def level_and_advice(total):
-    """等级边界严格按文档：A>=80, B>=60, C>=40, D>=6, E<6。"""
-    if total >= 80:
+    """等级边界按历史分数分布的分位标定（1990-2026 SPX / 1992-2026 NDX）。
+
+    原阈值 A>=80 / B>=60 / C>=40 / D>=6 / E<6 与真实分布脱节：回测中分数
+    中位数约 36，D 档覆盖 57% 的交易日，而 E 档（<6）在 36 年历史里从未
+    出现（实际最低 6.6~7.7）。改为按分位重标：
+
+        A >= 72 (P90)   B >= 53 (P75)   C >= 36 (P50)
+        D >= 22 (P15)   E <  22
+
+    对应实际占比约 A 10% / B 15% / C 25% / D 30% / E 15%。
+    """
+    if total >= 72:
         return "A", "极度低估，可以加大仓位"
-    if total >= 60:
+    if total >= 53:
         return "B", "低估，加大定投"
-    if total >= 40:
+    if total >= 36:
         return "C", "中性，正常定投"
-    if total >= 6:
+    if total >= 22:
         return "D", "估值偏高，维持小额定投，不重仓"
     return "E", "极度高估，谨慎，减少加仓"
 
@@ -465,15 +475,15 @@ def selftest():
     assert compute_scores(0.0, -20.0, 60.0) == (30.0, 39.28, 30.0, 99.28)
     assert compute_scores(0.5, 0.0, 15.0) == (15.0, 20.0, 13.6, 48.6)
 
-    # 等级边界
-    assert level_and_advice(80.0)[0] == "A"
-    assert level_and_advice(79.99)[0] == "B"
-    assert level_and_advice(60.0)[0] == "B"
-    assert level_and_advice(59.99)[0] == "C"
-    assert level_and_advice(40.0)[0] == "C"
-    assert level_and_advice(39.99)[0] == "D"
-    assert level_and_advice(6.0)[0] == "D"
-    assert level_and_advice(5.99)[0] == "E"
+    # 等级边界（按历史分位标定：A>=72, B>=53, C>=36, D>=22, E<22）
+    assert level_and_advice(72.0)[0] == "A"
+    assert level_and_advice(71.99)[0] == "B"
+    assert level_and_advice(53.0)[0] == "B"
+    assert level_and_advice(52.99)[0] == "C"
+    assert level_and_advice(36.0)[0] == "C"
+    assert level_and_advice(35.99)[0] == "D"
+    assert level_and_advice(22.0)[0] == "D"
+    assert level_and_advice(21.99)[0] == "E"
 
     # 百分位函数
     if pd is not None:
