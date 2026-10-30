@@ -9,6 +9,8 @@ on:
         description: Send the report by email after a manual run
         type: boolean
         default: false
+  # PR 上只跑测试与生成报告，不提交、不部署
+  pull_request:
 
 permissions:
   contents: read
@@ -58,6 +60,7 @@ jobs:
           path: _site/
 
       - name: 提交产物到仓库
+        if: github.event_name != 'pull_request'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -70,7 +73,7 @@ jobs:
           fi
   deploy:
     needs: run
-    if: ${{ !cancelled() && needs.run.result == 'success' }}
+    if: ${{ !cancelled() && needs.run.result == 'success' && github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
