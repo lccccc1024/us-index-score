@@ -26,8 +26,9 @@
 | D | ≥ 22 | 估值偏高，维持小额定投，不重仓 |
 | E | < 22 | 极度高估，谨慎，减少加仓 |
 
-> 等级边界按 1990–2026 历史分数分布的分位标定（A≈P90、B≈P75、C≈P50、D≈P15），
-> 对应实际占比约 A 10% / B 15% / C 25% / D 30% / E 15%。详见 `doc.md`。
+> 等级边界按历史分数分布标定。`scripts/backtest.py` 用公开数据复核（2026-10，SPX 月度近似）：
+> A ≈ P91（9.4%）、B ≈ P68（22.6%）、C ≈ P32（35.7%）、D ≈ P3（29.5%）、E < 22（2.8%，极少触发）。
+> 阈值未改动；原先声称的 P90/P75/P50/P15 与 A10/B15/C25/D30/E18 只有 A、D 两档吻合，详见 `doc.md`。
 
 ## 数据来源
 
@@ -66,6 +67,7 @@ pip install -r requirements.txt
 python index_score.py            # 生成当日评分
 python index_score.py --selftest # 公式自检（离线）
 python -m unittest discover -s tests -v # 数据处理回归测试（离线）
+python scripts/backtest.py       # 等级阈值的分位复核（需联网，约 2 MB 数据）
 ```
 
 输出：控制台打印 JSON 结果，并写入 `result.json` / `result.html`。
@@ -74,6 +76,7 @@ python -m unittest discover -s tests -v # 数据处理回归测试（离线）
 
 ```
 index_score.py                   主脚本（评分、HTML 渲染、自检）
+scripts/backtest.py              等级阈值的分位复核（可复现，需联网）
 requirements.txt                 依赖（yfinance / pandas / requests / xlrd）
 .github/workflows/daily-run.yml  每日自动化工作流
 index.html                       页面入口，跳转到最新报告
