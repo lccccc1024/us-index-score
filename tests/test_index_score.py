@@ -111,5 +111,22 @@ class ScoreTests(unittest.TestCase):
                 os.chdir(old)
 
 
+    def test_vix_uses_wide_window(self):
+        """VIX 取数窗口必须够宽：5d 在长假前后可能没有任何已完成交易日。"""
+        captured = {}
+
+        def history(**kwargs):
+            captured.update(kwargs)
+            return pd.DataFrame({'Close': [15.0]}, index=pd.date_range('2025-07-01', periods=1))
+
+        fake = SimpleNamespace(Ticker=lambda _: SimpleNamespace(history=history))
+        with patch.object(m, 'yf', fake):
+            vix, asof = m.fetch_vix()
+
+        self.assertEqual(captured['period'], '1mo')
+        self.assertEqual(vix, 15.0)
+        self.assertEqual(asof, '2025-07-01')
+
+
 if __name__ == '__main__':
     unittest.main()
