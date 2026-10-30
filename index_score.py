@@ -40,7 +40,6 @@ RETRIES = 3
 DANJUAN_URL = "https://danjuanfunds.com/djapi/index_eva/dj"
 DANJUAN_REFERER = "https://danjuanfunds.com/valuation/dj"
 SHILLER_PAGE = "https://shillerdata.com/"
-SHILLER_YALE_MIRROR = "http://www.econ.yale.edu/~shiller/data/ie_data.xls"
 SHILLER_YEARS = 10
 
 HEADERS = {
@@ -250,7 +249,9 @@ def fetch_market(ticker):
 def fetch_vix():
     if yf is None:
         raise RuntimeError("缺少 yfinance 依赖")
-    df = yf.Ticker("^VIX").history(period="5d", interval="1d", auto_adjust=False)
+    # 用 1mo 而不是 5d：长假前后 5 个自然日可能一个已完成交易日都没有，
+    # completed_closes 会直接抛错，导致整期评分失败。
+    df = yf.Ticker("^VIX").history(period="1mo", interval="1d", auto_adjust=False)
     if df is None or df.empty:
         raise RuntimeError("VIX 数据获取失败")
     close = completed_closes(df)
@@ -290,10 +291,14 @@ def _shiller_download_url():
     page = http_get(SHILLER_PAGE, timeout=60).text
     m = re.search(r'href="([^"]*ie_data[^"]*)"', page)
     if not m:
-        return SHILLER_YALE_MIRROR
+        raise RuntimeError("shillerdata.com 页面上找不到 ie_data 下载链接")
     url = m.group(1)
     if url.startswith("//"):
         url = "https:" + url
+    elif url.startswith("/"):
+        url = "https://shillerdata.com" + url
+    if not url.startswith("https://"):
+        raise RuntimeError(f"Shiller 下载地址不是 HTTPS，拒绝使用: {url}")
     return url
 
 
@@ -301,11 +306,9 @@ def fetch_shiller_pe_series():
     """Shiller 官方月度数据：PE = S&P Composite Price / Earnings，返回含 dt/pe 的 DataFrame。"""
     if pd is None:
         raise RuntimeError("缺少 pandas 依赖")
-    try:
-        url = _shiller_download_url()
-    except Exception as e:
-        log(f"解析 shillerdata.com 下载链接失败，回退 Yale 镜像: {e}")
-        url = SHILLER_YALE_MIRROR
+    # 只从主站取。旧实现会回退到 http:// 的 Yale 镜像（该站无 HTTPS），
+    # 明文传输可被中间人替换 PE 序列；Shiller 只是辅助参考，取不到就跳过。
+    url = _shiller_download_url()
     r = http_get(url, timeout=SHILLER_TIMEOUT)
     try:
         raw = pd.read_excel(BytesIO(r.content), header=None, sheet_name="Data")
