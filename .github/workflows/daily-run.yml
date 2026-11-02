@@ -27,7 +27,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: 拉取仓库代码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: 安装 Python 3.12
         uses: actions/setup-python@v7
