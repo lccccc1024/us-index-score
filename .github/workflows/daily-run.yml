@@ -50,7 +50,7 @@ jobs:
           mkdir -p _site
           cp index.html result.html result.json _site/
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: report
           path: _site/
