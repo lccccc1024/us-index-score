@@ -27,4 +27,4 @@ six==1.17.0
 soupsieve==3.0.4
 typing_extensions==4.16.0
 urllib3==2.8.0
-websockets==17.3
+websockets==17.4
