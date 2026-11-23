@@ -1,6 +1,6 @@
 # 直接依赖
 yfinance==1.7.0
-pandas==3.1.0
+pandas==3.1.1
 requests==2.34.2
 xlrd==2.0.2
 tzdata==2026.6
