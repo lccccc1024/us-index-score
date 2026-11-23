@@ -24,7 +24,7 @@ pycparser==3.12
 python-dateutil==3.0.0
 pytz==2026.6
 six==1.17.0
-soupsieve==3.0.4
+soupsieve==4.0.1
 typing_extensions==4.16.0
 urllib3==2.8.0
 websockets==17.3
